@@ -334,17 +334,17 @@ class ThalassaUI:  # pylint: disable=too-many-instance-attributes
             # No matter what widget we change (variable, timestamp, layer), we need to generate
             # a new trimesh object. This is why the trimesh is a local variable and not an
             # instance attribute (which would be cached)
-            trimesh = api.create_trimesh(ds=ds, variable=variable, timestamp=timestamp, layer=layer)
+            trimesh = api.create_trimesh(ds, variable=variable)
 
             # The wireframe is not always needed + it is always the same regardless of the variable.
             # So, we will generate it on the fly the first time we need it.
             # Therefore, we store it as an instance attribute in order to reuse it in future renders
             if self.show_mesh.value and self._mesh is None:
-                self._mesh = api.get_wireframe(trimesh=trimesh, x_range=lon_range, y_range=lat_range)
+                self._mesh = api.get_wireframe(trimesh, x_range=lon_range, y_range=lat_range)
 
             # The raster needs to be stored as an instance attribute, too, because we want to
             # be able to restore the zoom level whenever we re-render
-            self._raster = api.get_raster(trimesh=trimesh, x_range=lon_range, y_range=lat_range)
+            self._raster = api.get_raster(trimesh, x_range=lon_range, y_range=lat_range)
 
             # In order to control dynamically the ColorBar of the raster we create
             # a `panel.Row` with extra widgets
