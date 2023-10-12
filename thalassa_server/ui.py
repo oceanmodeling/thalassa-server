@@ -81,9 +81,13 @@ def get_spinner() -> pn.Column:
     return column
 
 
-def get_colorbar_row(raster: gv.DynamicMap) -> pn.Row:
-    clim_min = FloatInputNoSpinner(name="min")
-    clim_max = FloatInputNoSpinner(name="max")
+def get_colorbar_row(
+    raster: gv.DynamicMap,
+    clim_min_value: float | None = None,
+    clim_max_value: float | None = None,
+) -> pn.Row:
+    clim_min = FloatInputNoSpinner(name="Colorbar min", align="auto", value=clim_min_value)
+    clim_max = FloatInputNoSpinner(name="Colorbar max", align="center", value=clim_max_value)
     clim_apply = pn.widgets.Button(name="Apply", button_type="primary", align="end")
     clim_reset = pn.widgets.Button(name="reset", button_type="primary", align="end")
     # Set Input widgets JS callbacks
@@ -114,9 +118,9 @@ def get_colorbar_row(raster: gv.DynamicMap) -> pn.Row:
     )
     spacer = pn.layout.HSpacer()
     row = pn.Row(
+        spacer,
         clim_min,
         clim_max,
-        *[spacer] * 2,
         clim_apply,
         clim_reset,
     )
@@ -141,6 +145,7 @@ class ThalassaUI:  # pylint: disable=too-many-instance-attributes
         self._tiles: gv.Tiles = api.get_tiles()
         self._mesh: gv.DynamicMap | None = None
         self._raster: gv.DynamicMap | None = None
+        self._cbar_row: pn.Row | None = None
         self._stations: xr.Dataset | None = None
 
         # UI components
@@ -194,6 +199,9 @@ class ThalassaUI:  # pylint: disable=too-many-instance-attributes
 
         self._reset_ui(message=choose_info_message())
 
+    def _reset_colorbar(self) -> None:
+        self._cbar_row = None
+
     def _reset_ui(self, message: pn.pane.Alert) -> None:
         self.variable.param.set_param(options=[], disabled=True)
         self.time.param.set_param(options=[], disabled=True)
@@ -207,6 +215,7 @@ class ThalassaUI:  # pylint: disable=too-many-instance-attributes
         self._main.objects = [message]
         self._mesh = None
         self._raster = None
+        self._reset_colorbar()
 
     def _update_dataset_file(self, event: param.Event) -> None:
         dataset_file = self.dataset_file.value
@@ -238,6 +247,7 @@ class ThalassaUI:  # pylint: disable=too-many-instance-attributes
                     logger.error("activate animation")
                     self.show_animation.param.set_param(disabled=False)
                 self._main.objects = [PLEASE_RENDER]
+                self._reset_colorbar()
 
     def _on_variable_change(self, event: param.Event) -> None:
         logger.warning(event)
@@ -258,6 +268,7 @@ class ThalassaUI:  # pylint: disable=too-many-instance-attributes
                 self.show_timeseries.param.set_param(disabled=True)
                 self.time.param.set_param(options=[], disabled=True)
             self.render_button.param.set_param(disabled=False)
+            self._reset_colorbar()
         except Exception:
             logger.exception("error layer")
 
@@ -347,8 +358,18 @@ class ThalassaUI:  # pylint: disable=too-many-instance-attributes
             self._raster = api.get_raster(trimesh, x_range=lon_range, y_range=lat_range)
 
             # In order to control dynamically the ColorBar of the raster we create
-            # a `panel.Row` with extra widgets
-            cbar_row = get_colorbar_row(raster=self._raster)
+            # a `panel.Row` with extra widgets.
+            # When re-rendering we want to preserve the values of the Colobar widgets
+            clim_min = None
+            clim_max = None
+            if self._cbar_row:
+                clim_min = self._cbar_row[1].value  # type: ignore[union-attr]
+                clim_max = self._cbar_row[2].value  # type: ignore[union-attr]
+            self._cbar_row = get_colorbar_row(
+                raster=self._raster,
+                clim_min_value=clim_min,
+                clim_max_value=clim_max,
+            )
 
             # Construct the list of objects that will be part of the main overlay
             # Depending on the choices of the user, this list may be populated with
