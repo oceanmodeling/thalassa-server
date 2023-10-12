@@ -32,18 +32,15 @@ logger.debug(logging.getLogger("thalassa").handlers)
 
 # Set some defaults for the visualization of the graphs
 hvopts.defaults(
-    #     hvopts.Table(
-    #         height=300,
-    #     ),
-    #     hvopts.Curve(
-    #         responsive=False,
-    #          height=300,
-    #         show_title=True,
-    #         tools=["hover"],
-    #         active_tools=["pan", "wheel_zoom"],
-    #     ),
+    hvopts.Curve(
+        height=300,
+        responsive=True,
+        # show_title=True,
+        tools=["hover"],
+        active_tools=["pan", "wheel_zoom"],
+    ),
     hvopts.Image(
-        height=800,
+        height=500,
         responsive=True,
         # width_policy="max",
         # height_policy="max",
