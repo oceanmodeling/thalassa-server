@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import logging
+
 import panel as pn
 from holoviews import opts as hvopts
 from ruamel.yaml import YAML
-
 
 import thalassa_server.ui
 
@@ -60,10 +60,10 @@ ui = thalassa_server.ui.ThalassaUI()
 # template = pn.template.BootstrapTemplate(
 template = pn.template.MaterialTemplate(
     # site="example.com",
-    title="SeaReport",
+    title="Thalassa Server",
     # theme="dark",
-    logo="thalassa_server/static/logo.png",
-    favicon="thalassa_server/static/favicon.png",
+    # logo="thalassa_server/static/logo.png",
+    # favicon="thalassa_server/static/favicon.png",
     sidebar=[ui.sidebar],
     # sidebar_width=350,  # in pixels! must be an integer!
     # main_max_width="1350px", #  must be a string!
@@ -72,22 +72,5 @@ template = pn.template.MaterialTemplate(
 )
 
 template.header_background = "#2A6589"
-template.sidebar.append(
-    pn.Column(
-        # pn.layout.VSpacer(height=100),
-        pn.layout.VSpacer(),
-        pn.pane.Markdown(
-            """
-        ## Seareport is powered by:
-
-        - [pyPoseidon](https://github.com/ec-jrc/pyPoseidon/)
-        - [searvey](https://github.com/oceanmodeling/searvey/)
-        - [thalassa](https://github.com/ec-jrc/thalassa/)
-        - [schism](http://ccrm.vims.edu/schismweb/)
-        """,
-        ),
-        # pn.layout.VSpacer(height=100),
-    ),
-)
 
 _ = template.servable()

@@ -13,7 +13,6 @@ import geoviews as gv
 import panel as pn
 import param
 import xarray as xr
-
 from thalassa import api
 from thalassa import normalization
 from thalassa import utils
