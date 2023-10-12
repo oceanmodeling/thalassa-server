@@ -146,7 +146,6 @@ class ThalassaUI:  # pylint: disable=too-many-instance-attributes
         self._mesh: gv.DynamicMap | None = None
         self._raster: gv.DynamicMap | None = None
         self._cbar_row: pn.Row | None = None
-        self._stations: xr.Dataset | None = None
 
         # UI components
         self._main = pn.Column(CHOOSE_FILE, sizing_mode="scale_width")
@@ -157,14 +156,13 @@ class ThalassaUI:  # pylint: disable=too-many-instance-attributes
             name="Dataset file",
             options=["", *sorted(filter(normalization.can_be_inferred, glob.glob(DATA_GLOB)))],
         )
-        self.variable = pn.widgets.Select(name="Variable")
+        self.variable = pn.widgets.Select(name="Plot Variable")
+        self.ts_variable = pn.widgets.Select(name="Timeseries Variable")
         self.layer = pn.widgets.Select(name="Layer")
         self.time = pn.widgets.Select(name="Time")
         self.keep_zoom = pn.widgets.Checkbox(name="Keep Zoom", value=True)
         self.show_mesh = pn.widgets.Checkbox(name="Overlay Mesh")
-        self.show_timeseries = pn.widgets.Checkbox(name="Show Timeseries")
-        self.show_stations = pn.widgets.Checkbox(name="Show Stations")
-        self.show_animation = pn.widgets.Checkbox(name="Show animation")
+        # self.show_timeseries = pn.widgets.Checkbox(name="Show Timeseries")
         self.render_button = pn.widgets.Button(name="Render", button_type="primary")
 
         # Setup UI
@@ -175,13 +173,9 @@ class ThalassaUI:  # pylint: disable=too-many-instance-attributes
                     self.variable,
                     self.layer,
                     self.time,
+                    self.ts_variable,
                     self.keep_zoom,
                     self.show_mesh,
-                ),
-                pn.WidgetBox(
-                    self.show_timeseries,
-                    self.show_stations,
-                    self.show_animation,
                 ),
                 self.render_button,
             ),
@@ -191,9 +185,8 @@ class ThalassaUI:  # pylint: disable=too-many-instance-attributes
         # Define callback
         self.dataset_file.param.watch(fn=self._update_dataset_file, parameter_names="value")
         self.variable.param.watch(fn=self._on_variable_change, parameter_names="value")
-        self.show_timeseries.param.watch(fn=self._on_show_timeseries_clicked, parameter_names="value")
-        self.show_stations.param.watch(fn=self._on_show_stations_clicked, parameter_names="value")
-        self.show_animation.param.watch(fn=self._on_show_animation_clicked, parameter_names="value")
+        # self.ts_variable.param.watch(fn=self._on_variable_change, parameter_names="value")
+        # self.show_timeseries.param.watch(fn=self._on_show_timeseries_clicked, parameter_names="value")
         self.render_button.on_click(callback=self._update_main)
         logger.debug("Callback definitions: done")
 
@@ -204,13 +197,12 @@ class ThalassaUI:  # pylint: disable=too-many-instance-attributes
 
     def _reset_ui(self, message: pn.pane.Alert) -> None:
         self.variable.param.set_param(options=[], disabled=True)
+        self.ts_variable.param.set_param(options=[], disabled=True)
         self.time.param.set_param(options=[], disabled=True)
         self.layer.param.set_param(options=[], disabled=True)
         self.keep_zoom.param.set_param(disabled=True)
         self.show_mesh.param.set_param(disabled=True)
-        self.show_timeseries.param.set_param(disabled=True)
-        self.show_stations.param.set_param(disabled=True)
-        self.show_animation.param.set_param(disabled=True)
+        # self.show_timeseries.param.set_param(disabled=True)
         self.render_button.param.set_param(disabled=True)
         self._main.objects = [message]
         self._mesh = None
@@ -235,17 +227,17 @@ class ThalassaUI:  # pylint: disable=too-many-instance-attributes
                     self._dataset,
                     self._dataset.data_vars.keys(),
                 )
+                time_dependent_variables = [""] + [
+                    var for var in variables if "time" in self._dataset[var].dims
+                ]
                 self.variable.param.set_param(options=variables, value=variables[0], disabled=False)
+                self.ts_variable.param.set_param(
+                    options=time_dependent_variables,
+                    value=time_dependent_variables[0],
+                    disabled=False,
+                )
                 self.keep_zoom.param.set_param(disabled=False)
                 self.show_mesh.param.set_param(disabled=False)
-                if with_stem(pathlib.Path(dataset_file), "fskill").is_file():
-                    self.show_stations.param.set_param(disabled=False)
-                # If there is a corresponding video, then enable the show video widget
-                if pathlib.Path(dataset_file).with_suffix(".mp4").is_file():
-                    logger.error(str(pathlib.Path(dataset_file).with_suffix(".mp4")))
-                    logger.error(str(pathlib.Path(dataset_file).with_suffix(".mp4").is_file()))
-                    logger.error("activate animation")
-                    self.show_animation.param.set_param(disabled=False)
                 self._main.objects = [PLEASE_RENDER]
                 self._reset_colorbar()
 
@@ -262,31 +254,17 @@ class ThalassaUI:  # pylint: disable=too-many-instance-attributes
                 self.layer.param.set_param(options=[], disabled=True)
             # handle time
             if variable and "time" in ds[variable].dims:
-                self.show_timeseries.param.set_param(disabled=False)
-                self.time.param.set_param(options=["max", *ds.time.to_numpy()], disabled=False)
+                # self.show_timeseries.param.set_param(disabled=False)
+                # self.time.param.set_param(options=["max", *ds.time.to_numpy()], disabled=False)
+                self.time.param.set_param(options=ds.time.to_series().tolist(), disabled=False)
             else:
-                self.show_timeseries.param.set_param(disabled=True)
+                # self.show_timeseries.param.set_param(disabled=True)
                 self.time.param.set_param(options=[], disabled=True)
             self.render_button.param.set_param(disabled=False)
             self._reset_colorbar()
         except Exception:
             logger.exception("error layer")
-
-    # Make `show_*` Radio boxes mutually exclusive
-    def _on_show_timeseries_clicked(self, event: param.Event) -> None:
-        if self.show_timeseries.value:
-            self.show_animation.param.set_param(value=False)
-            self.show_stations.param.set_param(value=False)
-
-    def _on_show_stations_clicked(self, event: param.Event) -> None:
-        if self.show_stations.value:
-            self.show_timeseries.param.set_param(value=False)
-            self.show_animation.param.set_param(value=False)
-
-    def _on_show_animation_clicked(self, event: param.Event) -> None:
-        if self.show_animation.value:
-            self.show_timeseries.param.set_param(value=False)
-            self.show_stations.param.set_param(value=False)
+            raise
 
     def _debug_ui(self) -> None:
         logger.info("Widget values:")
@@ -338,6 +316,16 @@ class ThalassaUI:  # pylint: disable=too-many-instance-attributes
             timestamp = self.time.value
             layer = int(self.layer.value) if self.layer.value is not None else None
 
+            # We want to filter the dataset. But...
+            # For the raster plot we need to filter on time **and** layer
+            # While for the timeseries we filter just on layer
+            # So let's filter on layer first, keep a reference for the timeseries and filter on time afterwards
+            if layer:
+                ds = ds.sel(layer=layer)
+            ds_ts = ds
+            if timestamp:
+                ds = ds.sel(time=timestamp)
+
             # create plots
             # What we do here needs some explaining.
             # A prerequisite for generating the DynamicMaps is to create the trimesh.
@@ -380,41 +368,20 @@ class ThalassaUI:  # pylint: disable=too-many-instance-attributes
             if self.show_mesh.value:
                 main_overlay_components.append(self._mesh)
 
-            # The stations row and the ts_plot are only plotted if the relevant checkboxes
-            # have been checked. Nevertheless, we can add `None` to a `pn.Row/Column` and
+            # The ts_plot is only plotted if a timeseries variables has been selected.
+            # Nevertheless, we can add `None` to a `pn.Row/Column` and
             # that value will be ignored, which allows us to simplify the way we define
             # the rendable objects
-            stations_row = None
-            ts_plot = None
-            animation_row = None
-
-            # Render the stations if necessary
-            if self.show_stations.value:
-                # XXX fskill.nc is hardcoded!
-                stations = xr.open_dataset(DATA_DIR + "fskill.nc", cache=False)
-                station_pins = api.get_station_pins(stations=stations)
-                station_ts = api.get_station_timeseries(stations=stations, pins=station_pins)
-                station_info = api.get_station_table(stations=stations, pins=station_pins)
-                stations_row = pn.Column(
-                    station_ts,
-                    station_info,
-                )
-                main_overlay_components.append(station_pins)
-
-            # Render the timeseries if necessary
-            if self.show_timeseries.value:
+            ts_row = None
+            if self.ts_variable.value:
                 ts_plot = api.get_tap_timeseries(
-                    ds=ds,
-                    variable=variable,
+                    ds=ds_ts,
+                    variable=self.ts_variable.value,
                     source_raster=self._raster,
-                    layer=layer,
-                ).opts()
-
-            if self.show_animation.value:
-                mp4 = str(pathlib.Path(self.dataset_file.value).with_suffix(".mp4"))
-                animation_row = pn.Row(
-                    pn.pane.Video(mp4),
-                    sizing_mode="scale_width",
+                ).opts(responsive=True)
+                ts_row = pn.Column(
+                    pn.layout.Spacer(height=50),
+                    ts_plot,
                 )
 
             main_overlay = reduce(operator.mul, main_overlay_components)
@@ -425,12 +392,12 @@ class ThalassaUI:  # pylint: disable=too-many-instance-attributes
             # then the timeseries plot does not get updated each time we click on the
             # DynamicMap. By replacing the `objects` though, then the updates work fine.
             self._main.clear()
-            self._main.objects = [
-                row for row in (cbar_row, main_row, stations_row, ts_plot, animation_row) if row is not None
-            ]
+            self._main.objects = [row for row in (main_row, self._cbar_row, ts_row) if row is not None]
 
-        except Exception:
+        except Exception as exc:
+            print(exc)
             logger.exception("Something went wrong")
+            raise
 
     @property
     def sidebar(self) -> pn.Column:
